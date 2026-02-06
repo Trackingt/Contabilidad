@@ -32,11 +32,19 @@ export default function InventarioPage() {
 
     const { data, error } = await query;
     setLoading(false);
-    if (error) return alert(error.message);
-    setItems((data as any) || []);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setItems((data as Product[]) || []);
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
+
   useEffect(() => {
     const t = setTimeout(load, 250);
     return () => clearTimeout(t);
@@ -44,7 +52,8 @@ export default function InventarioPage() {
 
   return (
     <div className="p-4 pb-24">
-      <div className="flex items-center gap-2 mb-4">
+      {/* BUSCADOR */}
+      <div className="mb-4">
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -53,8 +62,11 @@ export default function InventarioPage() {
         />
       </div>
 
-      {loading && <div className="text-sm opacity-70">Cargando...</div>}
+      {loading && (
+        <div className="text-sm opacity-70">Cargando...</div>
+      )}
 
+      {/* LISTA */}
       <div className="space-y-3">
         {items.map((p) => (
           <div key={p.id} className="card bg-base-100 shadow">
@@ -62,24 +74,38 @@ export default function InventarioPage() {
               <div className="flex justify-between items-start gap-3">
                 <div>
                   <div className="font-semibold">{p.name}</div>
-                  {p.sku ? <div className="text-xs opacity-70">Código: {p.sku}</div> : null}
+                  {p.sku && (
+                    <div className="text-xs opacity-70">
+                      Código: {p.sku}
+                    </div>
+                  )}
                 </div>
 
-                <span className={`badge ${p.stock <= 0 ? "badge-error" : "badge-success"}`}>
-                  {p.stock <= 0 ? "No disponible" : `${p.stock} disponibles`}
+                <span
+                  className={`badge ${
+                    p.stock <= 0
+                      ? "badge-error"
+                      : "badge-success"
+                  }`}
+                >
+                  {p.stock <= 0
+                    ? "No disponible"
+                    : `${p.stock} disponibles`}
                 </span>
               </div>
 
               <div className="mt-2 text-sm">
                 <div>Precio: Q{Number(p.price).toFixed(2)}</div>
-                <div className="opacity-70">Costo: Q{Number(p.cost).toFixed(2)}</div>
+                <div className="opacity-70">
+                  Costo: Q{Number(p.cost).toFixed(2)}
+                </div>
               </div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Botón fijo abajo */}
+      {/* BOTÓN CREAR */}
       <button
         className="btn btn-primary fixed left-4 right-4 bottom-5"
         onClick={() => setOpenCreate(true)}
@@ -90,54 +116,142 @@ export default function InventarioPage() {
       {openCreate && (
         <CreateProductModal
           onClose={() => setOpenCreate(false)}
-          onCreated={() => { setOpenCreate(false); load(); }}
+          onCreated={() => {
+            setOpenCreate(false);
+            load();
+          }}
         />
       )}
     </div>
   );
 }
 
-function CreateProductModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+/* ================= MODAL CREAR ================= */
+
+function CreateProductModal({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: () => void;
+}) {
   const [name, setName] = useState("");
   const [sku, setSku] = useState("");
-  const [stock, setStock] = useState(0);
-  const [cost, setCost] = useState(0);
-  const [price, setPrice] = useState(0);
+
+  // 🔑 CLAVE: numéricos inician VACÍOS
+  const [stock, setStock] = useState<number | "">("");
+  const [cost, setCost] = useState<number | "">("");
+  const [price, setPrice] = useState<number | "">("");
+
   const [saving, setSaving] = useState(false);
 
   async function save() {
-    if (!name.trim()) return alert("Nombre requerido");
+    if (!name.trim()) {
+      alert("Nombre requerido");
+      return;
+    }
+
     setSaving(true);
 
     const { error } = await supabase.from("products").insert({
       name: name.trim(),
       sku: sku.trim() ? sku.trim() : null,
-      stock,
-      cost,
-      price,
+      stock: Number(stock || 0),
+      cost: Number(cost || 0),
+      price: Number(price || 0),
     });
 
     setSaving(false);
-    if (error) return alert(error.message);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
     onCreated();
   }
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center p-4">
       <div className="bg-base-100 w-full sm:max-w-md rounded-2xl p-4">
-        <div className="font-semibold text-lg mb-3">Crear producto</div>
+        <div className="font-semibold text-lg mb-3">
+          Crear producto
+        </div>
 
         <div className="space-y-2">
-          <input className="input input-bordered w-full" placeholder="Nombre" value={name} onChange={(e) => setName(e.target.value)} />
-          <input className="input input-bordered w-full" placeholder="Código de producto (SKU)" value={sku} onChange={(e) => setSku(e.target.value)} />
-          <input className="input input-bordered w-full" type="number" placeholder="Stock" value={stock} onChange={(e) => setStock(Number(e.target.value))} />
-          <input className="input input-bordered w-full" type="number" placeholder="Costo" value={cost} onChange={(e) => setCost(Number(e.target.value))} />
-          <input className="input input-bordered w-full" type="number" placeholder="Precio" value={price} onChange={(e) => setPrice(Number(e.target.value))} />
+          <input
+            className="input input-bordered w-full"
+            placeholder="Nombre"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+
+          <input
+            className="input input-bordered w-full"
+            placeholder="Código de producto (SKU)"
+            value={sku}
+            onChange={(e) => setSku(e.target.value)}
+          />
+
+          <input
+            className="input input-bordered w-full"
+            type="number"
+            inputMode="numeric"
+            placeholder="Stock"
+            value={stock}
+            onChange={(e) =>
+              setStock(
+                e.target.value === ""
+                  ? ""
+                  : Number(e.target.value)
+              )
+            }
+          />
+
+          <input
+            className="input input-bordered w-full"
+            type="number"
+            inputMode="decimal"
+            placeholder="Costo"
+            value={cost}
+            onChange={(e) =>
+              setCost(
+                e.target.value === ""
+                  ? ""
+                  : Number(e.target.value)
+              )
+            }
+          />
+
+          <input
+            className="input input-bordered w-full"
+            type="number"
+            inputMode="decimal"
+            placeholder="Precio"
+            value={price}
+            onChange={(e) =>
+              setPrice(
+                e.target.value === ""
+                  ? ""
+                  : Number(e.target.value)
+              )
+            }
+          />
         </div>
 
         <div className="flex gap-2 mt-4">
-          <button className="btn btn-ghost w-1/2" onClick={onClose}>Cancelar</button>
-          <button className="btn btn-primary w-1/2" onClick={save} disabled={saving}>
+          <button
+            className="btn btn-ghost w-1/2"
+            onClick={onClose}
+          >
+            Cancelar
+          </button>
+
+          <button
+            className="btn btn-primary w-1/2"
+            onClick={save}
+            disabled={saving}
+          >
             {saving ? "Guardando..." : "Guardar"}
           </button>
         </div>

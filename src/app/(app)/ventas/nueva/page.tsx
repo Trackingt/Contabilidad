@@ -1,9 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { User, Phone, Package, Hash, Save, Search, DollarSign } from "lucide-react";
+import {
+  User,
+  Phone,
+  Package,
+  Hash,
+  Save,
+  Search,
+  DollarSign,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
+
+/* =====================
+   TYPES
+===================== */
 
 type Product = {
   id: string;
@@ -13,12 +25,19 @@ type Product = {
   price: number;
 };
 
+/* =====================
+   PAGE
+===================== */
+
 export default function NuevaVentaPage() {
   const router = useRouter();
+
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
   const [productId, setProductId] = useState("");
+  const [openProducts, setOpenProducts] = useState(false);
 
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -29,10 +48,12 @@ export default function NuevaVentaPage() {
   const [loading, setLoading] = useState(false);
 
   /* ================= LOAD PRODUCTS ================= */
+
   async function loadProducts(q = "") {
     let query = supabase
       .from("products")
-      .select("id, name, sku, stock, price")
+      .select("id,name,sku,stock,price")
+      .eq("active", true)
       .order("name");
 
     if (q.trim()) {
@@ -52,7 +73,24 @@ export default function NuevaVentaPage() {
     return () => clearTimeout(t);
   }, [search]);
 
+  /* ================= CLOSE DROPDOWN ON OUTSIDE CLICK ================= */
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
+        setOpenProducts(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   /* ================= SAVE SALE ================= */
+
   async function saveSale() {
     if (!customerName || !productId || qty <= 0) {
       alert("Completa los datos obligatorios");
@@ -80,6 +118,8 @@ export default function NuevaVentaPage() {
   }
 
   const selectedProduct = products.find((p) => p.id === productId);
+
+  /* ================= UI ================= */
 
   return (
     <div className="max-w-xl mx-auto space-y-8 pb-24">
@@ -115,34 +155,66 @@ export default function NuevaVentaPage() {
         <div className="space-y-3">
           <label className="text-sm font-medium">Producto</label>
 
-          {/* Buscador */}
-          <div className="flex gap-2 items-center">
-            <Search size={16} />
-            <input
-              className="input input-bordered w-full"
-              placeholder="Buscar por nombre o código"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
+          {/* Selector buscable */}
+          <div className="relative" ref={dropdownRef}>
+            <div className="flex gap-2 items-center">
+              <Package size={16} />
+              <input
+                className="input input-bordered w-full"
+                placeholder="Buscar y seleccionar producto"
+                value={
+                  selectedProduct
+                    ? `${selectedProduct.name}${
+                        selectedProduct.sku
+                          ? " · " + selectedProduct.sku
+                          : ""
+                      }`
+                    : search
+                }
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setProductId("");
+                  setOpenProducts(true);
+                }}
+                onFocus={() => setOpenProducts(true)}
+              />
+            </div>
 
-          {/* Selector */}
-          <div className="flex gap-2 items-center">
-            <Package size={16} />
-            <select
-              className="select select-bordered w-full"
-              value={productId}
-              onChange={(e) => setProductId(e.target.value)}
-            >
-              <option value="">Seleccionar producto</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id} disabled={p.stock <= 0}>
-                  {p.name}
-                  {p.sku ? ` · ${p.sku}` : ""}
-                  {` (Stock: ${p.stock})`}
-                </option>
-              ))}
-            </select>
+            {openProducts && (
+              <div className="absolute z-20 mt-1 w-full bg-base-100 border rounded-xl shadow max-h-60 overflow-auto">
+                {products.length === 0 && (
+                  <div className="p-3 text-sm opacity-60">
+                    No hay productos
+                  </div>
+                )}
+
+                {products.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    disabled={p.stock <= 0}
+                    onClick={() => {
+                      setProductId(p.id);
+                      setOpenProducts(false);
+                      setSearch("");
+                    }}
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-base-200 ${
+                      p.stock <= 0
+                        ? "opacity-40 cursor-not-allowed"
+                        : ""
+                    }`}
+                  >
+                    <div className="font-medium">
+                      {p.name}
+                      {p.sku ? ` · ${p.sku}` : ""}
+                    </div>
+                    <div className="text-xs opacity-60">
+                      Stock: {p.stock} · Precio: Q{p.price.toFixed(2)}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Cantidad */}

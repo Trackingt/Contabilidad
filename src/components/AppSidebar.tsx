@@ -8,6 +8,7 @@ import {
   Wallet,
   BarChart3,
   Boxes,
+  Plus,
 } from "lucide-react";
 
 const items = [
@@ -22,8 +23,14 @@ const items = [
     icon: ShoppingCart,
   },
 
+  {
+    href: "/ventas/nueva", 
+    label: "Nueva venta",
+    icon: Plus,
+  },
+
     {
-    href: "/inventario", // 👈 NUEVO
+    href: "/inventario", 
     label: "Inventario",
     icon: Boxes,
   },
@@ -46,7 +53,7 @@ export default function AppSidebar() {
     <aside className="hidden md:block w-56 shrink-0 border-r border-[rgb(var(--border))] bg-[rgb(var(--card))]">
       <nav className="p-4 space-y-1">
         {items.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href;
+         const active = pathname === href || pathname.startsWith(href + "/");
 
           return (
             <Link

@@ -279,11 +279,9 @@ function EditProductModal({
 }) {
   const [name, setName] = useState(product.name);
   const [sku, setSku] = useState(product.sku ?? "");
-
   const [stock, setStock] = useState<number | "">(product.stock);
   const [cost, setCost] = useState<number | "">(product.cost);
   const [price, setPrice] = useState<number | "">(product.price);
-
   const [saving, setSaving] = useState(false);
 
   async function save() {
@@ -301,38 +299,79 @@ function EditProductModal({
       .eq("id", product.id);
 
     setSaving(false);
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
+    if (error) return alert(error.message);
     onSaved();
   }
 
   return (
     <Modal title="Editar producto" onClose={onClose}>
-      <ProductForm
-        name={name}
-        setName={setName}
-        sku={sku}
-        setSku={setSku}
-        stock={stock}
-        setStock={setStock}
-        cost={cost}
-        setCost={setCost}
-        price={price}
-        setPrice={setPrice}
-      />
+      <div className="space-y-5">
+        {/* IDENTIDAD */}
+        <div className="space-y-2">
+          <div>
+            <label className="text-sm font-medium">Nombre</label>
+            <input
+              className="input input-bordered w-full"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
 
-      <ModalActions
-        onClose={onClose}
-        onSave={save}
-        saving={saving}
-      />
+          <div>
+            <label className="text-sm font-medium">Código (SKU)</label>
+            <input
+              className="input input-bordered w-full"
+              value={sku}
+              onChange={(e) => setSku(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* STOCK + PRECIOS */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label className="text-sm font-medium">Stock</label>
+            <input
+              type="number"
+              className="input input-bordered w-full"
+              value={stock}
+              onChange={(e) =>
+                setStock(e.target.value === "" ? "" : Number(e.target.value))
+              }
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Costo</label>
+            <input
+              type="number"
+              className="input input-bordered w-full"
+              value={cost}
+              onChange={(e) =>
+                setCost(e.target.value === "" ? "" : Number(e.target.value))
+              }
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Precio</label>
+            <input
+              type="number"
+              className="input input-bordered w-full"
+              value={price}
+              onChange={(e) =>
+                setPrice(e.target.value === "" ? "" : Number(e.target.value))
+              }
+            />
+          </div>
+        </div>
+      </div>
+
+      <ModalActions onClose={onClose} onSave={save} saving={saving} />
     </Modal>
   );
 }
+
 
 /* =====================
    SHARED UI

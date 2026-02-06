@@ -7,6 +7,7 @@ import {
   ShoppingCart,
   Wallet,
   BarChart3,
+  Boxes,
 } from "lucide-react";
 
 const items = [
@@ -19,6 +20,12 @@ const items = [
     href: "/ventas",
     label: "Ventas",
     icon: ShoppingCart,
+  },
+
+    {
+    href: "/inventario", // 👈 NUEVO
+    label: "Inventario",
+    icon: Boxes,
   },
   {
     href: "/caja",

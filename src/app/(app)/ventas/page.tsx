@@ -9,30 +9,49 @@ import {
   CheckCircle2,
   Clock,
   ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+
+/* =====================
+   TYPES
+===================== */
+
+type SaleItem = {
+  id: string;
+  product_name: string;
+  qty: number;
+  price: number;
+};
 
 type Sale = {
   id: string;
   customer_name: string;
   customer_phone: string | null;
-  product_name: string;
-  qty: number;
   total: number;
   status: "pendiente" | "enviado";
   created_at: string;
+  sale_items: SaleItem[];
 };
 
 type StatusFilter = "all" | "pendiente" | "enviado";
 type DateFilter = "all" | "today" | "month";
 
+/* =====================
+   PAGE
+===================== */
+
 export default function VentasPage() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [dateFilter, setDateFilter] = useState<DateFilter>("all");
+  const [statusFilter, setStatusFilter] =
+    useState<StatusFilter>("all");
+  const [dateFilter, setDateFilter] =
+    useState<DateFilter>("all");
   const [search, setSearch] = useState("");
+
+  const [openRows, setOpenRows] = useState<string[]>([]);
 
   /* ================= LOAD ================= */
 
@@ -41,10 +60,25 @@ export default function VentasPage() {
 
     const { data, error } = await supabase
       .from("sales")
-      .select("*")
+      .select(
+        `
+        id,
+        customer_name,
+        customer_phone,
+        total,
+        status,
+        created_at,
+        sale_items (
+          id,
+          product_name,
+          qty,
+          price
+        )
+      `
+      )
       .order("created_at", { ascending: false });
 
-    if (!error) setSales(data || []);
+    if (!error) setSales((data as Sale[]) || []);
     setLoading(false);
   }
 
@@ -52,9 +86,12 @@ export default function VentasPage() {
     loadSales();
   }, []);
 
-  /* ================= STATUS UPDATE ================= */
+  /* ================= STATUS ================= */
 
-  async function updateStatus(id: string, status: Sale["status"]) {
+  async function updateStatus(
+    id: string,
+    status: Sale["status"]
+  ) {
     await supabase.from("sales").update({ status }).eq("id", id);
     loadSales();
   }
@@ -65,7 +102,8 @@ export default function VentasPage() {
     const now = new Date();
 
     return sales.filter((s) => {
-      if (statusFilter !== "all" && s.status !== statusFilter) return false;
+      if (statusFilter !== "all" && s.status !== statusFilter)
+        return false;
 
       const d = new Date(s.created_at);
       if (dateFilter === "today" && d.toDateString() !== now.toDateString())
@@ -83,33 +121,38 @@ export default function VentasPage() {
       return (
         s.customer_name.toLowerCase().includes(q) ||
         (s.customer_phone || "").toLowerCase().includes(q) ||
-        s.product_name.toLowerCase().includes(q)
+        s.sale_items.some((i) =>
+          i.product_name.toLowerCase().includes(q)
+        )
       );
     });
   }, [sales, statusFilter, dateFilter, search]);
 
   /* ================= TOTALS ================= */
 
-  const total = filteredSales.reduce((s, r) => s + Number(r.total), 0);
+  const total = filteredSales.reduce((s, r) => s + r.total, 0);
   const pendiente = filteredSales
     .filter((s) => s.status === "pendiente")
-    .reduce((a, b) => a + Number(b.total), 0);
+    .reduce((a, b) => a + b.total, 0);
   const enviado = filteredSales
     .filter((s) => s.status === "enviado")
-    .reduce((a, b) => a + Number(b.total), 0);
+    .reduce((a, b) => a + b.total, 0);
 
   /* ================= EXPORT ================= */
 
   function exportToExcel() {
-    const rows = filteredSales.map((s) => ({
-      Fecha: new Date(s.created_at).toLocaleDateString(),
-      Cliente: s.customer_name,
-      Telefono: s.customer_phone || "",
-      Producto: s.product_name,
-      Cantidad: s.qty,
-      Total_Q: s.total,
-      Estado: s.status,
-    }));
+    const rows = filteredSales.flatMap((s) =>
+      s.sale_items.map((i) => ({
+        Fecha: new Date(s.created_at).toLocaleDateString(),
+        Cliente: s.customer_name,
+        Telefono: s.customer_phone || "",
+        Producto: i.product_name,
+        Cantidad: i.qty,
+        Precio: i.price,
+        Total_Q: i.qty * i.price,
+        Estado: s.status,
+      }))
+    );
 
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -209,50 +252,82 @@ export default function VentasPage() {
           <table className="min-w-full text-sm">
             <thead>
               <tr>
+                <th className="p-3"></th>
                 <th className="p-3">Fecha</th>
                 <th className="p-3">Cliente</th>
-                <th className="p-3">Producto</th>
-                <th className="p-3 text-center">Cant.</th>
                 <th className="p-3 text-right">Total</th>
                 <th className="p-3 text-center">Estado</th>
               </tr>
             </thead>
             <tbody>
-              {filteredSales.map((s) => (
-                <tr key={s.id} className="border-t">
-                  <td className="p-3">
-                    {new Date(s.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="p-3">{s.customer_name}</td>
-                  <td className="p-3">{s.product_name}</td>
-                  <td className="p-3 text-center">{s.qty}</td>
-                  <td className="p-3 text-right font-medium">
-                    Q{s.total}
-                  </td>
-                  <td className="p-3 text-center">
-                    <div className="relative inline-flex items-center gap-1">
-                      <select
-                        value={s.status}
-                        onChange={(e) =>
-                          updateStatus(
-                            s.id,
-                            e.target.value as Sale["status"]
-                          )
-                        }
-                        className="px-2 py-1 text-xs rounded border bg-transparent"
-                      >
-                        <option value="pendiente">Pendiente</option>
-                        <option value="enviado">Enviado</option>
-                      </select>
-                      <ChevronDown size={14} />
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {filteredSales.map((s) => {
+                const open = openRows.includes(s.id);
+
+                return (
+                  <>
+                    <tr key={s.id} className="border-t">
+                      <td className="p-3">
+                        <button
+                          onClick={() =>
+                            setOpenRows((prev) =>
+                              prev.includes(s.id)
+                                ? prev.filter((i) => i !== s.id)
+                                : [...prev, s.id]
+                            )
+                          }
+                        >
+                          {open ? (
+                            <ChevronDown size={16} />
+                          ) : (
+                            <ChevronRight size={16} />
+                          )}
+                        </button>
+                      </td>
+                      <td className="p-3">
+                        {new Date(s.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="p-3">{s.customer_name}</td>
+                      <td className="p-3 text-right font-medium">
+                        Q{s.total}
+                      </td>
+                      <td className="p-3 text-center">
+                        <select
+                          value={s.status}
+                          onChange={(e) =>
+                            updateStatus(
+                              s.id,
+                              e.target.value as Sale["status"]
+                            )
+                          }
+                          className="px-2 py-1 text-xs rounded border bg-transparent"
+                        >
+                          <option value="pendiente">Pendiente</option>
+                          <option value="enviado">Enviado</option>
+                        </select>
+                      </td>
+                    </tr>
+
+                    {open && (
+                      <tr className="bg-base-200/40">
+                        <td colSpan={5} className="p-3">
+                          <ul className="text-sm space-y-1">
+                            {s.sale_items.map((i) => (
+                              <li key={i.id}>
+                                {i.qty} × {i.product_name} — Q
+                                {(i.qty * i.price).toFixed(2)}
+                              </li>
+                            ))}
+                          </ul>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                );
+              })}
 
               {filteredSales.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="p-6 text-center opacity-60">
+                  <td colSpan={5} className="p-6 text-center opacity-60">
                     No hay ventas registradas
                   </td>
                 </tr>

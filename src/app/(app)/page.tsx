@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Boxes } from "lucide-react";
 import {
   TrendingUp,
   Calendar,
@@ -56,7 +57,7 @@ export default function DashboardPage() {
       {/* ACCIONES */}
       <section className="space-y-4">
         <h2 className="text-xs font-medium text-muted uppercase tracking-wider">
-          Acciones rápidas
+          Gestión
         </h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -66,6 +67,11 @@ export default function DashboardPage() {
             label="Nueva venta"
             primary
           />
+           <Action
+  href="/inventario"
+  icon={<Boxes size={18} />}
+  label="Inventario de productos"
+/>
           <Action
             href="/ventas"
             icon={<List size={18} />}

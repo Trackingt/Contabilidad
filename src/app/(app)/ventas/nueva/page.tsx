@@ -8,7 +8,6 @@ import {
   Package,
   Hash,
   Save,
-  Search,
   DollarSign,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -31,7 +30,6 @@ type Product = {
 
 export default function NuevaVentaPage() {
   const router = useRouter();
-
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -44,7 +42,6 @@ export default function NuevaVentaPage() {
 
   const [qty, setQty] = useState(1);
   const [dtfCost, setDtfCost] = useState(0);
-
   const [loading, setLoading] = useState(false);
 
   /* ================= LOAD PRODUCTS ================= */
@@ -73,7 +70,7 @@ export default function NuevaVentaPage() {
     return () => clearTimeout(t);
   }, [search]);
 
-  /* ================= CLOSE DROPDOWN ON OUTSIDE CLICK ================= */
+  /* ================= CLOSE DROPDOWN ================= */
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -86,14 +83,22 @@ export default function NuevaVentaPage() {
     }
 
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    return () =>
+      document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  const selectedProduct = products.find((p) => p.id === productId);
 
   /* ================= SAVE SALE ================= */
 
   async function saveSale() {
     if (!customerName || !productId || qty <= 0) {
       alert("Completa los datos obligatorios");
+      return;
+    }
+
+    if (selectedProduct && qty > selectedProduct.stock) {
+      alert("La cantidad supera el stock disponible");
       return;
     }
 
@@ -117,8 +122,6 @@ export default function NuevaVentaPage() {
     router.push("/ventas");
   }
 
-  const selectedProduct = products.find((p) => p.id === productId);
-
   /* ================= UI ================= */
 
   return (
@@ -126,7 +129,7 @@ export default function NuevaVentaPage() {
       <h1 className="text-2xl font-semibold">Nueva venta</h1>
 
       <div className="card p-6 space-y-6">
-        {/* ================= CLIENTE ================= */}
+        {/* CLIENTE */}
         <div className="space-y-2">
           <label className="text-sm font-medium">Cliente</label>
 
@@ -151,73 +154,63 @@ export default function NuevaVentaPage() {
           </div>
         </div>
 
-        {/* ================= PRODUCTO ================= */}
-        <div className="space-y-3">
+        {/* PRODUCTO */}
+        <div className="space-y-3" ref={dropdownRef}>
           <label className="text-sm font-medium">Producto</label>
 
-          {/* Selector buscable */}
-          <div className="relative" ref={dropdownRef}>
-            <div className="flex gap-2 items-center">
-              <Package size={16} />
-              <input
-                className="input input-bordered w-full"
-                placeholder="Buscar y seleccionar producto"
-                value={
-                  selectedProduct
-                    ? `${selectedProduct.name}${
-                        selectedProduct.sku
-                          ? " · " + selectedProduct.sku
-                          : ""
-                      }`
-                    : search
-                }
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setProductId("");
-                  setOpenProducts(true);
-                }}
-                onFocus={() => setOpenProducts(true)}
-              />
-            </div>
-
-            {openProducts && (
-              <div className="absolute z-20 mt-1 w-full bg-base-100 border rounded-xl shadow max-h-60 overflow-auto">
-                {products.length === 0 && (
-                  <div className="p-3 text-sm opacity-60">
-                    No hay productos
-                  </div>
-                )}
-
-                {products.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    disabled={p.stock <= 0}
-                    onClick={() => {
-                      setProductId(p.id);
-                      setOpenProducts(false);
-                      setSearch("");
-                    }}
-                    className={`w-full text-left px-3 py-2 text-sm hover:bg-base-200 ${
-                      p.stock <= 0
-                        ? "opacity-40 cursor-not-allowed"
-                        : ""
-                    }`}
-                  >
-                    <div className="font-medium">
-                      {p.name}
-                      {p.sku ? ` · ${p.sku}` : ""}
-                    </div>
-                    <div className="text-xs opacity-60">
-                      Stock: {p.stock} · Precio: Q{p.price.toFixed(2)}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
+          <div className="flex gap-2 items-center">
+            <Package size={16} />
+            <input
+              className="input input-bordered w-full"
+              placeholder="Buscar y seleccionar producto"
+              value={
+                selectedProduct
+                  ? `${selectedProduct.name}${selectedProduct.sku ? " · " + selectedProduct.sku : ""}`
+                  : search
+              }
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setProductId("");
+                setOpenProducts(true);
+              }}
+              onFocus={() => setOpenProducts(true)}
+            />
           </div>
 
-          {/* Cantidad */}
+          {openProducts && (
+            <div className="border rounded-xl bg-base-100 shadow max-h-56 overflow-auto">
+              {products.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  disabled={p.stock <= 0}
+                  onClick={() => {
+                    setProductId(p.id);
+                    setOpenProducts(false);
+                    setSearch("");
+                  }}
+                  className={`w-full text-left px-4 py-3 border-b last:border-b-0 hover:bg-base-200 ${
+                    p.stock <= 0
+                      ? "opacity-40 cursor-not-allowed"
+                      : ""
+                  }`}
+                >
+                  <div className="font-medium">
+                    {p.name}
+                    {p.sku ? ` · ${p.sku}` : ""}
+                  </div>
+                  <div className="text-xs opacity-60">
+                    Stock: {p.stock} · Precio: Q{p.price.toFixed(2)}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* CANTIDAD */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Cantidad</label>
           <div className="flex gap-2 items-center">
             <Hash size={16} />
             <input
@@ -228,17 +221,9 @@ export default function NuevaVentaPage() {
               onChange={(e) => setQty(Number(e.target.value))}
             />
           </div>
-
-          {/* Info producto */}
-          {selectedProduct && (
-            <div className="text-sm opacity-70">
-              Precio unitario: Q{selectedProduct.price.toFixed(2)} ·
-              Disponible: {selectedProduct.stock}
-            </div>
-          )}
         </div>
 
-        {/* ================= DTF ================= */}
+        {/* DTF */}
         <div className="space-y-2">
           <label className="text-sm font-medium">Costo DTF</label>
           <div className="flex gap-2 items-center">
@@ -253,12 +238,9 @@ export default function NuevaVentaPage() {
               placeholder="Q0.00"
             />
           </div>
-          <div className="text-xs opacity-60">
-            Este costo se descuenta automáticamente de la ganancia
-          </div>
         </div>
 
-        {/* ================= SAVE ================= */}
+        {/* SAVE */}
         <button
           onClick={saveSale}
           disabled={loading}

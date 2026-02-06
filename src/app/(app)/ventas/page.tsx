@@ -8,6 +8,7 @@ import {
   FileSpreadsheet,
   CheckCircle2,
   Clock,
+  ChevronDown,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -29,37 +30,40 @@ export default function VentasPage() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // filtros
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
   const [search, setSearch] = useState("");
 
+  /* ================= LOAD ================= */
+
   async function loadSales() {
     setLoading(true);
-    const { data } = await supabase
+
+    const { data, error } = await supabase
       .from("sales")
       .select("*")
       .order("created_at", { ascending: false });
-    setSales(data || []);
-    setLoading(false);
-  }
 
-  async function toggleStatus(id: string, current: Sale["status"]) {
-    const next = current === "pendiente" ? "enviado" : "pendiente";
-    await supabase.from("sales").update({ status: next }).eq("id", id);
-    loadSales();
+    if (!error) setSales(data || []);
+    setLoading(false);
   }
 
   useEffect(() => {
     loadSales();
   }, []);
 
-  /* ======================
-     FILTRADO
-     ====================== */
+  /* ================= STATUS UPDATE ================= */
+
+  async function updateStatus(id: string, status: Sale["status"]) {
+    await supabase.from("sales").update({ status }).eq("id", id);
+    loadSales();
+  }
+
+  /* ================= FILTER ================= */
 
   const filteredSales = useMemo(() => {
     const now = new Date();
+
     return sales.filter((s) => {
       if (statusFilter !== "all" && s.status !== statusFilter) return false;
 
@@ -84,9 +88,7 @@ export default function VentasPage() {
     });
   }, [sales, statusFilter, dateFilter, search]);
 
-  /* ======================
-     TOTALES
-     ====================== */
+  /* ================= TOTALS ================= */
 
   const total = filteredSales.reduce((s, r) => s + Number(r.total), 0);
   const pendiente = filteredSales
@@ -96,9 +98,7 @@ export default function VentasPage() {
     .filter((s) => s.status === "enviado")
     .reduce((a, b) => a + Number(b.total), 0);
 
-  /* ======================
-     EXPORTAR
-     ====================== */
+  /* ================= EXPORT ================= */
 
   function exportToExcel() {
     const rows = filteredSales.map((s) => ({
@@ -120,18 +120,13 @@ export default function VentasPage() {
     );
   }
 
-  /* ======================
-     RENDER
-     ====================== */
+  /* ================= UI ================= */
 
   return (
     <div className="space-y-6">
-      {/* HEADER */}
       <div>
         <h1 className="text-2xl font-semibold">Ventas</h1>
-        <p className="text-sm opacity-70">
-          Libro diario con filtros y exportación
-        </p>
+        <p className="text-sm opacity-70">Registro de ventas</p>
       </div>
 
       {/* FILTROS */}
@@ -164,7 +159,7 @@ export default function VentasPage() {
           <Search size={16} />
           <input
             className="w-full"
-            placeholder="Buscar cliente, producto o teléfono"
+            placeholder="Buscar cliente o producto"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -213,14 +208,13 @@ export default function VentasPage() {
         ) : (
           <table className="min-w-full text-sm">
             <thead>
-              <tr className="text-left">
+              <tr>
                 <th className="p-3">Fecha</th>
                 <th className="p-3">Cliente</th>
                 <th className="p-3">Producto</th>
                 <th className="p-3 text-center">Cant.</th>
                 <th className="p-3 text-right">Total</th>
                 <th className="p-3 text-center">Estado</th>
-                <th className="p-3 text-center">Acción</th>
               </tr>
             </thead>
             <tbody>
@@ -236,30 +230,30 @@ export default function VentasPage() {
                     Q{s.total}
                   </td>
                   <td className="p-3 text-center">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs ${
-                        s.status === "enviado"
-                          ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
-                          : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300"
-                      }`}
-                    >
-                      {s.status}
-                    </span>
-                  </td>
-                  <td className="p-3 text-center">
-                    <button
-                      onClick={() => toggleStatus(s.id, s.status)}
-                      className="btn"
-                    >
-                      Cambiar
-                    </button>
+                    <div className="relative inline-flex items-center gap-1">
+                      <select
+                        value={s.status}
+                        onChange={(e) =>
+                          updateStatus(
+                            s.id,
+                            e.target.value as Sale["status"]
+                          )
+                        }
+                        className="px-2 py-1 text-xs rounded border bg-transparent"
+                      >
+                        <option value="pendiente">Pendiente</option>
+                        <option value="enviado">Enviado</option>
+                      </select>
+                      <ChevronDown size={14} />
+                    </div>
                   </td>
                 </tr>
               ))}
+
               {filteredSales.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="p-6 text-center opacity-60">
-                    No hay resultados
+                  <td colSpan={6} className="p-6 text-center opacity-60">
+                    No hay ventas registradas
                   </td>
                 </tr>
               )}

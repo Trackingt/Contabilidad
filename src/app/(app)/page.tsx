@@ -12,6 +12,7 @@ import {
   List,
   BarChart3,
   Boxes,
+  Truck,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -47,7 +48,6 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   const today = new Date().toISOString().slice(0, 10);
-  const monthStart = today.slice(0, 7) + "-01";
 
   /* ======================
      LOAD DATA
@@ -93,7 +93,7 @@ export default function DashboardPage() {
       sales
         .filter((s) => s.created_at.startsWith(today))
         .reduce((sum, s) => sum + s.total, 0),
-    [sales]
+    [sales, today]
   );
 
   const ventasMes = useMemo(
@@ -101,7 +101,7 @@ export default function DashboardPage() {
       sales
         .filter((s) => s.created_at.startsWith(today.slice(0, 7)))
         .reduce((sum, s) => sum + s.total, 0),
-    [sales]
+    [sales, today]
   );
 
   const pendiente = useMemo(
@@ -129,7 +129,7 @@ export default function DashboardPage() {
           const cost = i.products[0]?.cost || 0;
           return sum + cost * i.qty;
         }, 0),
-    [sales]
+    [sales, today]
   );
 
   const gastosHoy = useMemo(
@@ -137,7 +137,7 @@ export default function DashboardPage() {
       expenses
         .filter((e) => e.expense_date === today)
         .reduce((sum, e) => sum + e.amount, 0),
-    [expenses]
+    [expenses, today]
   );
 
   const gananciaHoy = ventasHoy - costoHoy - gastosHoy;
@@ -162,28 +162,28 @@ export default function DashboardPage() {
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
         <Metric
           label="Ventas hoy"
-          value={`Q${ventasHoy}`}
+          value={`Q${ventasHoy.toFixed(2)}`}
           icon={<TrendingUp size={18} />}
           accent
         />
         <Metric
           label="Ventas del mes"
-          value={`Q${ventasMes}`}
+          value={`Q${ventasMes.toFixed(2)}`}
           icon={<Calendar size={18} />}
         />
         <Metric
           label="Pendiente"
-          value={`Q${pendiente}`}
+          value={`Q${pendiente.toFixed(2)}`}
           icon={<Clock size={18} />}
         />
         <Metric
           label="Enviado"
-          value={`Q${enviado}`}
+          value={`Q${enviado.toFixed(2)}`}
           icon={<CheckCircle size={18} />}
         />
         <Metric
           label="Ganancia hoy"
-          value={`Q${gananciaHoy}`}
+          value={`Q${gananciaHoy.toFixed(2)}`}
           icon={<Wallet size={18} />}
         />
       </section>
@@ -204,7 +204,7 @@ export default function DashboardPage() {
           <Action
             href="/inventario"
             icon={<Boxes size={18} />}
-            label="Inventario de productos"
+            label="Inventario"
           />
           <Action
             href="/ventas"
@@ -220,6 +220,11 @@ export default function DashboardPage() {
             href="/graficas"
             icon={<BarChart3 size={18} />}
             label="Gráficas"
+          />
+          <Action
+            href="https://trackingt.github.io/order-tracking/admin.html"
+            icon={<Truck size={18} />}
+            label="Seguimiento pedidos"
           />
         </div>
       </section>
@@ -252,7 +257,6 @@ function Metric({
         {icon}
         <span>{label}</span>
       </div>
-
       <div
         className={`text-3xl font-semibold tracking-tight ${
           accent ? "text-green-400" : "text-white"
@@ -275,11 +279,29 @@ function Action({
   label: string;
   primary?: boolean;
 }) {
+  const isExternal = href.startsWith("http");
+
+  if (isExternal) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="group card p-5 flex items-center gap-4 transition hover:-translate-y-px hover:shadow-md"
+      >
+        <div className="h-9 w-9 rounded-md flex items-center justify-center bg-white/5 text-muted">
+          {icon}
+        </div>
+        <span className="font-medium">{label}</span>
+      </a>
+    );
+  }
+
   return (
     <Link
       href={href}
       className={`group card p-5 flex items-center gap-4 transition
-        hover:-translate-y-[1px] hover:shadow-md
+        hover:-translate-y-px hover:shadow-md
         ${primary ? "border-green-500/30" : ""}
       `}
     >
@@ -294,7 +316,6 @@ function Action({
       >
         {icon}
       </div>
-
       <span className="font-medium">{label}</span>
     </Link>
   );

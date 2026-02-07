@@ -205,7 +205,7 @@ export default function NuevaVentaPage() {
               className="input input-bordered w-full"
               value={customerPhone}
               onChange={(e) => setCustomerPhone(e.target.value)}
-              placeholder="Teléfono (opcional)"
+              placeholder="Teléfono (opcional) si queres"
             />
           </div>
         </div>

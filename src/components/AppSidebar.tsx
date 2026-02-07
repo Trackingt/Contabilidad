@@ -44,6 +44,12 @@ const items = [
     label: "Gráficas",
     icon: BarChart3,
   },
+  {
+    href: "https://trackingt.github.io/order-tracking/admin.html",
+    label: "Seguimiento pedidos",
+    icon: Boxes,
+    external: true,
+  },
 ];
 
 export default function AppSidebar() {
@@ -52,26 +58,41 @@ export default function AppSidebar() {
   return (
     <aside className="hidden md:block w-56 shrink-0 border-r border-[rgb(var(--border))] bg-[rgb(var(--card))]">
       <nav className="p-4 space-y-1">
-        {items.map(({ href, label, icon: Icon }) => {
-         const active = pathname === href || pathname.startsWith(href + "/");
+{items.map(({ href, label, icon: Icon, external }) => {
+  const active =
+    !external && (pathname === href || pathname.startsWith(href + "/"));
 
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm transition
-                ${
-                  active
-                    ? "bg-green-500/15 text-green-400"
-                    : "hover:bg-white/5 text-muted"
-                }
-              `}
-            >
-              <Icon size={18} />
-              {label}
-            </Link>
-          );
-        })}
+  const classes = `flex items-center gap-3 px-3 py-2 rounded-md text-sm transition
+    ${
+      active
+        ? "bg-green-500/15 text-green-400"
+        : "hover:bg-white/5 text-muted"
+    }
+  `;
+
+  if (external) {
+    return (
+      <a
+        key={href}
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={classes}
+      >
+        <Icon size={18} />
+        {label}
+      </a>
+    );
+  }
+
+  return (
+    <Link key={href} href={href} className={classes}>
+      <Icon size={18} />
+      {label}
+    </Link>
+  );
+})}
+
       </nav>
     </aside>
   );

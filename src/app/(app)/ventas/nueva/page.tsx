@@ -155,11 +155,11 @@ export default function NuevaVentaPage() {
     setLoading(true);
 
     const items = cart.map((i) => ({
-      product_id: i.product.id,
-      product_name: i.product.name,
-      qty: i.qty,
-      price: i.product.price,
-    }));
+  product_id: i.product.id,
+  qty: i.qty,
+  unit_price: i.product.price,
+}));
+
 
     const { error } = await supabase.rpc("create_sale_multi", {
       p_customer_name: customerName,

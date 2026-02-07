@@ -1,15 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import * as XLSX from "xlsx";
+import { useEffect, useState } from "react";
 import {
-  Search,
-  Filter,
-  FileSpreadsheet,
-  CheckCircle2,
-  Clock,
   ChevronDown,
   ChevronRight,
+  Trash2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -45,12 +40,15 @@ export default function VentasPage() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [openRows, setOpenRows] = useState<string[]>([]);
-  const [search, setSearch] = useState("");
+
+  /* =====================
+     LOAD
+  ===================== */
 
   async function loadSales() {
     setLoading(true);
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("sales")
       .select(`
         id,
@@ -71,7 +69,7 @@ export default function VentasPage() {
       `)
       .order("created_at", { ascending: false });
 
-    setSales((data as Sale[]) || []);
+    if (!error) setSales((data as Sale[]) || []);
     setLoading(false);
   }
 
@@ -88,6 +86,23 @@ export default function VentasPage() {
       const cost = i.products[0]?.cost || 0;
       return sum + (i.unit_price - cost) * i.qty;
     }, 0);
+  }
+
+  /* =====================
+     DELETE SALE
+  ===================== */
+
+  async function deleteSale(id: string) {
+    const ok = confirm(
+      "¿Eliminar esta venta? Esta acción no se puede deshacer."
+    );
+    if (!ok) return;
+
+    // eliminar items primero (seguridad)
+    await supabase.from("sale_items").delete().eq("sale_id", id);
+    await supabase.from("sales").delete().eq("id", id);
+
+    loadSales();
   }
 
   /* =====================
@@ -111,6 +126,7 @@ export default function VentasPage() {
                 <th className="p-3 text-right">Total</th>
                 <th className="p-3 text-right">Ganancia</th>
                 <th className="p-3 text-center">Estado</th>
+                <th className="p-3 text-center">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -131,23 +147,46 @@ export default function VentasPage() {
                             )
                           }
                         >
-                          {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                          {open ? (
+                            <ChevronDown size={16} />
+                          ) : (
+                            <ChevronRight size={16} />
+                          )}
                         </button>
                       </td>
+
                       <td className="p-3">
                         {new Date(s.created_at).toLocaleDateString()}
                       </td>
+
                       <td className="p-3">{s.customer_name}</td>
-                      <td className="p-3 text-right">Q{s.total.toFixed(2)}</td>
+
+                      <td className="p-3 text-right">
+                        Q{s.total.toFixed(2)}
+                      </td>
+
                       <td className="p-3 text-right text-green-600">
                         Q{profit.toFixed(2)}
                       </td>
-                      <td className="p-3 text-center">{s.status}</td>
+
+                      <td className="p-3 text-center">
+                        {s.status}
+                      </td>
+
+                      <td className="p-3 text-center">
+                        <button
+                          onClick={() => deleteSale(s.id)}
+                          className="text-red-500 hover:text-red-700"
+                          title="Eliminar venta"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
                     </tr>
 
                     {open && (
                       <tr className="bg-base-200/40">
-                        <td colSpan={6} className="p-3">
+                        <td colSpan={7} className="p-3">
                           <ul className="space-y-1">
                             {s.sale_items.map((i) => (
                               <li key={i.id}>
@@ -162,6 +201,17 @@ export default function VentasPage() {
                   </>
                 );
               })}
+
+              {sales.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={7}
+                    className="p-6 text-center opacity-60"
+                  >
+                    No hay ventas registradas
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         )}

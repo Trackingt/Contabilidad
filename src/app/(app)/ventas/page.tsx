@@ -19,10 +19,13 @@ import { supabase } from "@/lib/supabaseClient";
 
 type SaleItem = {
   id: string;
-  product_name: string;
   qty: number;
-  price: number;
+  unit_price: number;
+  products: {
+    name: string;
+  }[]; // 👈 ARRAY
 };
+
 
 type Sale = {
   id: string;
@@ -60,8 +63,7 @@ export default function VentasPage() {
 
     const { data, error } = await supabase
       .from("sales")
-      .select(
-        `
+      .select(`
         id,
         customer_name,
         customer_phone,
@@ -70,12 +72,13 @@ export default function VentasPage() {
         created_at,
         sale_items (
           id,
-          product_name,
           qty,
-          price
+          unit_price,
+          products (
+            name
+          )
         )
-      `
-      )
+      `)
       .order("created_at", { ascending: false });
 
     if (!error) setSales((data as Sale[]) || []);
@@ -106,8 +109,12 @@ export default function VentasPage() {
         return false;
 
       const d = new Date(s.created_at);
-      if (dateFilter === "today" && d.toDateString() !== now.toDateString())
+      if (
+        dateFilter === "today" &&
+        d.toDateString() !== now.toDateString()
+      )
         return false;
+
       if (
         dateFilter === "month" &&
         (d.getMonth() !== now.getMonth() ||
@@ -122,7 +129,8 @@ export default function VentasPage() {
         s.customer_name.toLowerCase().includes(q) ||
         (s.customer_phone || "").toLowerCase().includes(q) ||
         s.sale_items.some((i) =>
-          i.product_name.toLowerCase().includes(q)
+          (i.products[0]?.name || "").toLowerCase().includes(q)
+
         )
       );
     });
@@ -146,10 +154,10 @@ export default function VentasPage() {
         Fecha: new Date(s.created_at).toLocaleDateString(),
         Cliente: s.customer_name,
         Telefono: s.customer_phone || "",
-        Producto: i.product_name,
+       Producto: i.products[0]?.name || "",
         Cantidad: i.qty,
-        Precio: i.price,
-        Total_Q: i.qty * i.price,
+        Precio_Unitario: i.unit_price,
+        Total_Q: i.qty * i.unit_price,
         Estado: s.status,
       }))
     );
@@ -288,7 +296,7 @@ export default function VentasPage() {
                       </td>
                       <td className="p-3">{s.customer_name}</td>
                       <td className="p-3 text-right font-medium">
-                        Q{s.total}
+                        Q{s.total.toFixed(2)}
                       </td>
                       <td className="p-3 text-center">
                         <select
@@ -313,8 +321,9 @@ export default function VentasPage() {
                           <ul className="text-sm space-y-1">
                             {s.sale_items.map((i) => (
                               <li key={i.id}>
-                                {i.qty} × {i.product_name} — Q
-                                {(i.qty * i.price).toFixed(2)}
+                                {i.qty} × {i.products[0]?.name} — Q
+
+                                {(i.qty * i.unit_price).toFixed(2)}
                               </li>
                             ))}
                           </ul>

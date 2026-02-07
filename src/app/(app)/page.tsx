@@ -1,5 +1,7 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Boxes } from "lucide-react";
 import {
   TrendingUp,
   Calendar,
@@ -9,9 +11,141 @@ import {
   Plus,
   List,
   BarChart3,
+  Boxes,
 } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
+
+/* ======================
+   TYPES
+====================== */
+
+type Sale = {
+  total: number;
+  status: "pendiente" | "enviado";
+  created_at: string;
+  sale_items: {
+    qty: number;
+    unit_price: number;
+    products: {
+      cost: number;
+    }[];
+  }[];
+};
+
+type Expense = {
+  amount: number;
+  expense_date: string;
+};
+
+/* ======================
+   PAGE
+====================== */
 
 export default function DashboardPage() {
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const monthStart = today.slice(0, 7) + "-01";
+
+  /* ======================
+     LOAD DATA
+  ====================== */
+
+  async function loadData() {
+    setLoading(true);
+
+    const { data: salesData } = await supabase
+      .from("sales")
+      .select(`
+        total,
+        status,
+        created_at,
+        sale_items (
+          qty,
+          unit_price,
+          products (
+            cost
+          )
+        )
+      `);
+
+    const { data: expensesData } = await supabase
+      .from("expenses")
+      .select("amount, expense_date");
+
+    setSales(salesData || []);
+    setExpenses(expensesData || []);
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  /* ======================
+     CALCULOS
+  ====================== */
+
+  const ventasHoy = useMemo(
+    () =>
+      sales
+        .filter((s) => s.created_at.startsWith(today))
+        .reduce((sum, s) => sum + s.total, 0),
+    [sales]
+  );
+
+  const ventasMes = useMemo(
+    () =>
+      sales
+        .filter((s) => s.created_at.startsWith(today.slice(0, 7)))
+        .reduce((sum, s) => sum + s.total, 0),
+    [sales]
+  );
+
+  const pendiente = useMemo(
+    () =>
+      sales
+        .filter((s) => s.status === "pendiente")
+        .reduce((sum, s) => sum + s.total, 0),
+    [sales]
+  );
+
+  const enviado = useMemo(
+    () =>
+      sales
+        .filter((s) => s.status === "enviado")
+        .reduce((sum, s) => sum + s.total, 0),
+    [sales]
+  );
+
+  const costoHoy = useMemo(
+    () =>
+      sales
+        .filter((s) => s.created_at.startsWith(today))
+        .flatMap((s) => s.sale_items)
+        .reduce((sum, i) => {
+          const cost = i.products[0]?.cost || 0;
+          return sum + cost * i.qty;
+        }, 0),
+    [sales]
+  );
+
+  const gastosHoy = useMemo(
+    () =>
+      expenses
+        .filter((e) => e.expense_date === today)
+        .reduce((sum, e) => sum + e.amount, 0),
+    [expenses]
+  );
+
+  const gananciaHoy = ventasHoy - costoHoy - gastosHoy;
+
+  /* ======================
+     UI
+  ====================== */
+
   return (
     <main className="max-w-6xl mx-auto px-6 py-10 space-y-12">
       {/* HEADER */}
@@ -28,28 +162,28 @@ export default function DashboardPage() {
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
         <Metric
           label="Ventas hoy"
-          value="Q24"
+          value={`Q${ventasHoy}`}
           icon={<TrendingUp size={18} />}
           accent
         />
         <Metric
           label="Ventas del mes"
-          value="Q24"
+          value={`Q${ventasMes}`}
           icon={<Calendar size={18} />}
         />
         <Metric
           label="Pendiente"
-          value="Q0"
+          value={`Q${pendiente}`}
           icon={<Clock size={18} />}
         />
         <Metric
           label="Enviado"
-          value="Q24"
+          value={`Q${enviado}`}
           icon={<CheckCircle size={18} />}
         />
         <Metric
           label="Ganancia hoy"
-          value="Q24"
+          value={`Q${gananciaHoy}`}
           icon={<Wallet size={18} />}
         />
       </section>
@@ -67,11 +201,11 @@ export default function DashboardPage() {
             label="Nueva venta"
             primary
           />
-           <Action
-  href="/inventario"
-  icon={<Boxes size={18} />}
-  label="Inventario de productos"
-/>
+          <Action
+            href="/inventario"
+            icon={<Boxes size={18} />}
+            label="Inventario de productos"
+          />
           <Action
             href="/ventas"
             icon={<List size={18} />}
@@ -89,13 +223,17 @@ export default function DashboardPage() {
           />
         </div>
       </section>
+
+      {loading && (
+        <p className="text-sm opacity-60">Cargando datos…</p>
+      )}
     </main>
   );
 }
 
 /* ======================
    COMPONENTES
-   ====================== */
+====================== */
 
 function Metric({
   icon,

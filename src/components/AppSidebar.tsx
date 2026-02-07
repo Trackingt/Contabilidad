@@ -9,6 +9,7 @@ import {
   BarChart3,
   Boxes,
   Plus,
+  Truck,
 } from "lucide-react";
 
 const items = [
@@ -45,11 +46,12 @@ const items = [
     icon: BarChart3,
   },
   {
-    href: "https://trackingt.github.io/order-tracking/admin.html",
-    label: "Seguimiento pedidos",
-    icon: Boxes,
-    external: true,
-  },
+  href: "https://trackingt.github.io/order-tracking/admin.html",
+  label: "Seguimiento pedidos",
+  icon: Truck,
+  external: true,
+},
+
 ];
 
 export default function AppSidebar() {
@@ -60,9 +62,10 @@ export default function AppSidebar() {
       <nav className="p-4 space-y-1">
 {items.map(({ href, label, icon: Icon, external }) => {
   const active =
-    !external && (pathname === href || pathname.startsWith(href + "/"));
+    !external &&
+    (pathname === href || pathname.startsWith(href + "/"));
 
-  const classes = `flex items-center gap-3 px-3 py-2 rounded-md text-sm transition
+  const className = `flex items-center gap-3 px-3 py-2 rounded-md text-sm transition
     ${
       active
         ? "bg-green-500/15 text-green-400"
@@ -73,11 +76,11 @@ export default function AppSidebar() {
   if (external) {
     return (
       <a
-        key={href}
+        key={label}
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className={classes}
+        className={className}
       >
         <Icon size={18} />
         {label}
@@ -86,7 +89,7 @@ export default function AppSidebar() {
   }
 
   return (
-    <Link key={href} href={href} className={classes}>
+    <Link key={href} href={href} className={className}>
       <Icon size={18} />
       {label}
     </Link>

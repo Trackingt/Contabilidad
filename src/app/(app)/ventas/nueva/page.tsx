@@ -156,6 +156,7 @@ export default function NuevaVentaPage() {
 
     const items = cart.map((i) => ({
       product_id: i.product.id,
+      product_name: i.product.name, 
       qty: i.qty,
       unit_price: i.product.price,
       unit_cost: i.product.cost,

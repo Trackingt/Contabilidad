@@ -1,6 +1,6 @@
 "use client";
+import { Fragment, useEffect, useState } from "react";
 
-import { useEffect, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -17,10 +17,10 @@ type SaleItem = {
   qty: number;
   unit_price: number;
   unit_cost: number;
-  products: {
-    name: string;
-  }[]; // 👈 ARRAY, como Supabase lo entrega
+  product_name: string;
+  
 };
+
 
 
 type Sale = {
@@ -61,12 +61,13 @@ export default function VentasPage() {
         status,
         created_at,
         sale_items (
-          id,
-          qty,
-          unit_price,
-          unit_cost,
-          products ( name )
-        )
+  id,
+  qty,
+  unit_price,
+  unit_cost,
+  product_name
+)
+
       `)
       .order("created_at", { ascending: false });
 
@@ -164,103 +165,103 @@ export default function VentasPage() {
                 const open = openRows.includes(s.id);
                 const profit = getProfit(s);
 
-                return (
-                  <>
-                    <tr key={s.id} className="border-t">
-                      <td className="p-3">
-                        <button
-                          onClick={() =>
-                            setOpenRows((prev) =>
-                              prev.includes(s.id)
-                                ? prev.filter((i) => i !== s.id)
-                                : [...prev, s.id]
-                            )
-                          }
-                        >
-                          {open ? (
-                            <ChevronDown size={16} />
-                          ) : (
-                            <ChevronRight size={16} />
-                          )}
-                        </button>
-                      </td>
+             return (
+  <Fragment key={s.id}>
+    <tr className="border-t">
+      <td className="p-3">
+        <button
+          onClick={() =>
+            setOpenRows((prev) =>
+              prev.includes(s.id)
+                ? prev.filter((i) => i !== s.id)
+                : [...prev, s.id]
+            )
+          }
+        >
+          {open ? (
+            <ChevronDown size={16} />
+          ) : (
+            <ChevronRight size={16} />
+          )}
+        </button>
+      </td>
 
-                      <td className="p-3">
-                        {new Date(s.created_at).toLocaleDateString()}
-                      </td>
+      <td className="p-3">
+        {new Date(s.created_at).toLocaleDateString()}
+      </td>
 
-                      <td className="p-3">{s.customer_name}</td>
+      <td className="p-3">{s.customer_name}</td>
 
-                      <td className="p-3 text-right">
-                        Q{s.total.toFixed(2)}
-                      </td>
+      <td className="p-3 text-right">
+        Q{s.total.toFixed(2)}
+      </td>
 
-                      <td
-                        className={`p-3 text-right font-medium ${
-                          profit >= 0
-                            ? "text-green-600"
-                            : "text-red-600"
-                        }`}
-                      >
-                        Q{profit.toFixed(2)}
-                      </td>
+      <td
+        className={`p-3 text-right font-medium ${
+          profit >= 0 ? "text-green-600" : "text-red-600"
+        }`}
+      >
+        Q{profit.toFixed(2)}
+      </td>
 
-                      <td className="p-3 text-center">
-                        <button
-                          onClick={() => toggleStatus(s)}
-                          className={`px-2 py-1 rounded text-xs ${
-                            s.status === "enviado"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-yellow-100 text-yellow-700"
-                          }`}
-                        >
-                          {s.status}
-                        </button>
-                      </td>
+      <td className="p-3 text-center">
+        <button
+          onClick={() => toggleStatus(s)}
+          className={`px-2 py-1 rounded text-xs ${
+            s.status === "enviado"
+              ? "bg-green-100 text-green-700"
+              : "bg-yellow-100 text-yellow-700"
+          }`}
+        >
+          {s.status}
+        </button>
+      </td>
 
-                      <td className="p-3 text-center">
-                        <button
-                          onClick={() => toggleStatus(s)}
-                          title="Cambiar estado"
-                          className="text-blue-500 hover:text-blue-700 mr-3"
-                        >
-                          <RefreshCw size={16} />
-                        </button>
+      <td className="p-3 text-center">
+        <button
+          onClick={() => toggleStatus(s)}
+          title="Cambiar estado"
+          className="text-blue-500 hover:text-blue-700 mr-3"
+        >
+          <RefreshCw size={16} />
+        </button>
 
-                        <button
-                          onClick={() => deleteSale(s.id)}
-                          title="Eliminar venta"
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </td>
-                    </tr>
+        <button
+          onClick={() => deleteSale(s.id)}
+          title="Eliminar venta"
+          className="text-red-500 hover:text-red-700"
+        >
+          <Trash2 size={16} />
+        </button>
+      </td>
+    </tr>
 
-                    {open && (
-                      <tr className="bg-base-200/40">
-                        <td colSpan={7} className="p-3">
-                          <ul className="space-y-1">
-                            {s.sale_items.map((i) => (
-                              <li key={i.id}>
-                                {i.qty} ×{" "}
-                               {i.products?.[0]?.name ?? "Producto"}  — Q
-                                {(i.qty * i.unit_price).toFixed(2)}
-                              </li>
-                            ))}
+    {open && (
+      <tr className="bg-base-200/40">
+        <td colSpan={7} className="p-3">
+          <ul className="space-y-1">
+            {s.sale_items.map((i) => (
+              <li key={i.id}>
+                {i.qty} ×{" "}
+                <span className="font-medium">
+                  {i.product_name}
+                </span>{" "}
+                — Q{(i.qty * i.unit_price).toFixed(2)}
+              </li>
+            ))}
 
-                            {s.dtf_cost > 0 && (
-                              <li className="text-xs opacity-70">
-                                Costo DTF: − Q
-                                {s.dtf_cost.toFixed(2)}
-                              </li>
-                            )}
-                          </ul>
-                        </td>
-                      </tr>
-                    )}
-                  </>
-                );
+            {s.dtf_cost > 0 && (
+              <li className="text-xs opacity-70">
+                Costo DTF: − Q{s.dtf_cost.toFixed(2)}
+              </li>
+            )}
+          </ul>
+        </td>
+      </tr>
+    )}
+  </Fragment>
+);
+
               })}
 
               {sales.length === 0 && (

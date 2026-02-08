@@ -12,6 +12,7 @@ import {
   BarChart3,
   Boxes,
   Truck,
+  Calendar,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -26,6 +27,7 @@ type SaleItem = {
 
 type Sale = {
   total: number;
+  dtf_cost: number;
   status: "pendiente" | "enviado";
   created_at: string;
   sale_items: SaleItem[];
@@ -44,10 +46,14 @@ export default function DashboardPage() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
-  const [period, setPeriod] = useState<"day" | "month">("day");
 
+  // 🔥 FILTRO FECHA
+  const [from, setFrom] = useState<string>("");
+  const [to, setTo] = useState<string>("");
+
+  // 🔥 ATAJOS
   const today = new Date().toISOString().slice(0, 10);
-  const month = today.slice(0, 7);
+  const monthStart = today.slice(0, 7) + "-01";
 
   /* ======================
      LOAD DATA
@@ -60,6 +66,7 @@ export default function DashboardPage() {
       .from("sales")
       .select(`
         total,
+        dtf_cost,
         status,
         created_at,
         sale_items (
@@ -82,65 +89,72 @@ export default function DashboardPage() {
   }, []);
 
   /* ======================
-     FILTRO POR PERIODO
+     FILTRO VENTAS
   ====================== */
 
-  const salesPeriodo = useMemo(() => {
-    return sales.filter((s) =>
-      period === "day"
-        ? s.created_at.startsWith(today)
-        : s.created_at.startsWith(month)
-    );
-  }, [sales, period, today, month]);
+  const salesFiltradas = useMemo(() => {
+    return sales.filter((s) => {
+      const d = s.created_at.slice(0, 10);
+
+      if (from && d < from) return false;
+      if (to && d > to) return false;
+
+      return true;
+    });
+  }, [sales, from, to]);
 
   /* ======================
-     CALCULOS CONTABLES
+     CALCULOS
   ====================== */
 
   const totalVentas = useMemo(
-    () => salesPeriodo.reduce((sum, s) => sum + s.total, 0),
-    [salesPeriodo]
+    () => salesFiltradas.reduce((sum, s) => sum + s.total, 0),
+    [salesFiltradas]
   );
 
   const pendiente = useMemo(
     () =>
-      salesPeriodo
+      salesFiltradas
         .filter((s) => s.status === "pendiente")
         .reduce((sum, s) => sum + s.total, 0),
-    [salesPeriodo]
+    [salesFiltradas]
   );
 
   const enviado = useMemo(
     () =>
-      salesPeriodo
+      salesFiltradas
         .filter((s) => s.status === "enviado")
         .reduce((sum, s) => sum + s.total, 0),
-    [salesPeriodo]
+    [salesFiltradas]
   );
 
-  // 🔥 COSTO REAL (desde sale_items.unit_cost)
-  const costoPeriodo = useMemo(
+  const costoProductos = useMemo(
     () =>
-      salesPeriodo
+      salesFiltradas
         .flatMap((s) => s.sale_items)
         .reduce((sum, i) => sum + i.unit_cost * i.qty, 0),
-    [salesPeriodo]
+    [salesFiltradas]
   );
 
-  const gastosPeriodo = useMemo(
+  const dtfTotal = useMemo(
+    () => salesFiltradas.reduce((sum, s) => sum + s.dtf_cost, 0),
+    [salesFiltradas]
+  );
+
+  const gastos = useMemo(
     () =>
       expenses
-        .filter((e) =>
-          period === "day"
-            ? e.expense_date === today
-            : e.expense_date.startsWith(month)
-        )
+        .filter((e) => {
+          if (from && e.expense_date < from) return false;
+          if (to && e.expense_date > to) return false;
+          return true;
+        })
         .reduce((sum, e) => sum + e.amount, 0),
-    [expenses, period, today, month]
+    [expenses, from, to]
   );
 
-  // ✅ GANANCIA REAL
-  const gananciaPeriodo = totalVentas - costoPeriodo - gastosPeriodo;
+  const ganancia =
+    totalVentas - costoProductos - dtfTotal - gastos;
 
   /* ======================
      UI
@@ -149,39 +163,77 @@ export default function DashboardPage() {
   return (
     <main className="max-w-6xl mx-auto px-6 py-10 space-y-10">
       {/* HEADER */}
-      <header>
-        <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted">Resumen general del negocio</p>
+      <header className="flex flex-col gap-2">
+        <h1 className="text-3xl font-semibold tracking-tight">
+          Dashboard
+        </h1>
+        <p className="text-sm text-muted">
+          Resumen general del negocio
+        </p>
       </header>
 
-      {/* SELECTOR PERIODO */}
-      <div className="flex gap-2">
+      {/* FILTROS */}
+      <section className="card p-4 flex flex-wrap gap-4 items-end">
+        <div className="flex items-center gap-2 text-sm text-muted">
+          <Calendar size={16} />
+          <span>Filtrar por fecha</span>
+        </div>
+
+        <div>
+          <label className="text-xs text-muted">Desde</label>
+          <input
+            type="date"
+            className="input input-bordered"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+          />
+        </div>
+
+        <div>
+          <label className="text-xs text-muted">Hasta</label>
+          <input
+            type="date"
+            className="input input-bordered"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+          />
+        </div>
+
         <button
-          onClick={() => setPeriod("day")}
-          className={`px-4 py-1 rounded-md text-sm ${
-            period === "day"
-              ? "bg-green-500/20 text-green-400"
-              : "bg-white/5 text-muted"
-          }`}
+          onClick={() => {
+            setFrom(today);
+            setTo(today);
+          }}
+          className="btn btn-ghost btn-sm"
         >
-          Diario
+          Hoy
         </button>
+
         <button
-          onClick={() => setPeriod("month")}
-          className={`px-4 py-1 rounded-md text-sm ${
-            period === "month"
-              ? "bg-green-500/20 text-green-400"
-              : "bg-white/5 text-muted"
-          }`}
+          onClick={() => {
+            setFrom(monthStart);
+            setTo(today);
+          }}
+          className="btn btn-ghost btn-sm"
         >
-          Mensual
+          Este mes
         </button>
-      </div>
+
+        <button
+          onClick={() => {
+            setFrom("");
+            setTo("");
+          }}
+          className="btn btn-ghost btn-sm text-error"
+        >
+          Limpiar
+        </button>
+      </section>
 
       {/* MÉTRICAS */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <Metric
-          label={period === "day" ? "Ventas hoy" : "Ventas del mes"}
+          label="Ventas"
           value={`Q${totalVentas.toFixed(2)}`}
           icon={<TrendingUp size={18} />}
           accent
@@ -197,8 +249,8 @@ export default function DashboardPage() {
           icon={<CheckCircle size={18} />}
         />
         <Metric
-          label={period === "day" ? "Ganancia hoy" : "Ganancia del mes"}
-          value={`Q${gananciaPeriodo.toFixed(2)}`}
+          label="Ganancia"
+          value={`Q${ganancia.toFixed(2)}`}
           icon={<Wallet size={18} />}
         />
       </section>
@@ -249,7 +301,11 @@ function Metric({
         {icon}
         <span>{label}</span>
       </div>
-      <div className={`text-3xl font-semibold ${accent ? "text-green-400" : ""}`}>
+      <div
+        className={`text-3xl font-semibold ${
+          accent ? "text-green-400" : ""
+        }`}
+      >
         {value}
       </div>
     </div>
@@ -269,12 +325,17 @@ function Action({
 }) {
   const isExternal = href.startsWith("http");
 
-  const baseClass =
+  const base =
     "group card p-5 flex items-center gap-4 transition hover:-translate-y-px hover:shadow-md";
 
   if (isExternal) {
     return (
-      <a href={href} target="_blank" rel="noopener noreferrer" className={baseClass}>
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={base}
+      >
         <div className="h-9 w-9 rounded-md flex items-center justify-center bg-white/5 text-muted">
           {icon}
         </div>
@@ -286,7 +347,9 @@ function Action({
   return (
     <Link
       href={href}
-      className={`${baseClass} ${primary ? "border-green-500/30" : ""}`}
+      className={`${base} ${
+        primary ? "border-green-500/30" : ""
+      }`}
     >
       <div
         className={`h-9 w-9 rounded-md flex items-center justify-center ${

@@ -6,7 +6,6 @@ import {
   User,
   Phone,
   Package,
-  Hash,
   Save,
   DollarSign,
   Trash2,
@@ -23,6 +22,7 @@ type Product = {
   sku: string | null;
   stock: number;
   price: number;
+  cost: number;
 };
 
 type CartItem = {
@@ -55,7 +55,7 @@ export default function NuevaVentaPage() {
   async function loadProducts(q = "") {
     let query = supabase
       .from("products")
-      .select("id,name,sku,stock,price")
+      .select("id,name,sku,stock,price,cost")
       .eq("active", true)
       .order("name");
 
@@ -93,7 +93,7 @@ export default function NuevaVentaPage() {
       document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  /* ================= CART LOGIC ================= */
+  /* ================= CART ================= */
 
   function addToCart(product: Product) {
     setCart((prev) => {
@@ -137,12 +137,12 @@ export default function NuevaVentaPage() {
     );
   }
 
-  const subtotal = cart.reduce(
-    (s, i) => s + i.qty * i.product.price,
+  /* ================= TOTAL (solo UI) ================= */
+
+  const total = cart.reduce(
+    (sum, i) => sum + i.qty * i.product.price,
     0
   );
-
-  const total = Math.max(0, subtotal - dtfCost);
 
   /* ================= SAVE SALE ================= */
 
@@ -155,18 +155,21 @@ export default function NuevaVentaPage() {
     setLoading(true);
 
     const items = cart.map((i) => ({
-  product_id: i.product.id,
-  qty: i.qty,
-  unit_price: i.product.price,
-}));
+      product_id: i.product.id,
+      qty: i.qty,
+      unit_price: i.product.price,
+      unit_cost: i.product.cost,
+    }));
 
-
-    const { error } = await supabase.rpc("create_sale_multi", {
-      p_customer_name: customerName,
-      p_customer_phone: customerPhone || null,
-      p_items: items,
-      p_dtf_cost: dtfCost,
-    });
+    const { error } = await supabase.rpc(
+      "create_sale_multi",
+      {
+        p_customer_name: customerName,
+        p_customer_phone: customerPhone || null,
+        p_items: items,
+        p_dtf_cost: dtfCost,
+      }
+    );
 
     setLoading(false);
 
@@ -210,7 +213,7 @@ export default function NuevaVentaPage() {
           </div>
         </div>
 
-        {/* PRODUCTO */}
+        {/* PRODUCTOS */}
         <div className="space-y-3" ref={dropdownRef}>
           <label className="text-sm font-medium">Productos</label>
 
@@ -294,7 +297,9 @@ export default function NuevaVentaPage() {
 
         {/* DTF */}
         <div className="space-y-2">
-          <label className="text-sm font-medium">Costo DTF</label>
+          <label className="text-sm font-medium">
+            Costo DTF (no afecta el total)
+          </label>
           <div className="flex gap-2 items-center">
             <DollarSign size={16} />
             <input

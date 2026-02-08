@@ -5,13 +5,13 @@ import {
   ChevronDown,
   ChevronRight,
   Trash2,
+  RefreshCw,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
 /* =====================
    TYPES
 ===================== */
-
 type SaleItem = {
   id: string;
   qty: number;
@@ -19,14 +19,16 @@ type SaleItem = {
   unit_cost: number;
   products: {
     name: string;
-  }[];
+  }[]; // 👈 ARRAY, como Supabase lo entrega
 };
+
 
 type Sale = {
   id: string;
   customer_name: string;
   customer_phone: string | null;
-  total: number;
+  total: number;       // 🔒 ya no nullable
+  dtf_cost: number;    // 🔒 ya no nullable
   status: "pendiente" | "enviado";
   created_at: string;
   sale_items: SaleItem[];
@@ -55,6 +57,7 @@ export default function VentasPage() {
         customer_name,
         customer_phone,
         total,
+        dtf_cost,
         status,
         created_at,
         sale_items (
@@ -62,9 +65,7 @@ export default function VentasPage() {
           qty,
           unit_price,
           unit_cost,
-          products (
-            name
-          )
+          products ( name )
         )
       `)
       .order("created_at", { ascending: false });
@@ -72,7 +73,7 @@ export default function VentasPage() {
     if (error) {
       alert(error.message);
     } else {
-      setSales((data || []) as Sale[]);
+      setSales((data ?? []) as Sale[]);
     }
 
     setLoading(false);
@@ -83,14 +84,36 @@ export default function VentasPage() {
   }, []);
 
   /* =====================
-     GANANCIA REAL
+     PROFIT (REAL & SAFE)
   ===================== */
 
   function getProfit(sale: Sale) {
-    return sale.sale_items.reduce(
-      (sum, i) => sum + (i.unit_price - i.unit_cost) * i.qty,
+    const costos = sale.sale_items.reduce(
+      (sum, i) => sum + i.unit_cost * i.qty,
       0
     );
+
+    return sale.total - costos - sale.dtf_cost;
+  }
+
+  /* =====================
+     CHANGE STATUS
+  ===================== */
+
+  async function toggleStatus(sale: Sale) {
+    const next =
+      sale.status === "pendiente" ? "enviado" : "pendiente";
+
+    const { error } = await supabase
+      .from("sales")
+      .update({ status: next })
+      .eq("id", sale.id);
+
+    if (error) {
+      alert(error.message);
+    } else {
+      loadSales();
+    }
   }
 
   /* =====================
@@ -125,8 +148,8 @@ export default function VentasPage() {
         ) : (
           <table className="min-w-full text-sm">
             <thead>
-              <tr>
-                <th className="p-3"></th>
+              <tr className="border-b">
+                <th className="p-3 w-8"></th>
                 <th className="p-3">Fecha</th>
                 <th className="p-3">Cliente</th>
                 <th className="p-3 text-right">Total</th>
@@ -163,32 +186,51 @@ export default function VentasPage() {
                       </td>
 
                       <td className="p-3">
-                        {new Date(
-                          s.created_at
-                        ).toLocaleDateString()}
+                        {new Date(s.created_at).toLocaleDateString()}
                       </td>
 
-                      <td className="p-3">
-                        {s.customer_name}
-                      </td>
+                      <td className="p-3">{s.customer_name}</td>
 
                       <td className="p-3 text-right">
                         Q{s.total.toFixed(2)}
                       </td>
 
-                      <td className="p-3 text-right text-green-600">
+                      <td
+                        className={`p-3 text-right font-medium ${
+                          profit >= 0
+                            ? "text-green-600"
+                            : "text-red-600"
+                        }`}
+                      >
                         Q{profit.toFixed(2)}
                       </td>
 
                       <td className="p-3 text-center">
-                        {s.status}
+                        <button
+                          onClick={() => toggleStatus(s)}
+                          className={`px-2 py-1 rounded text-xs ${
+                            s.status === "enviado"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-yellow-100 text-yellow-700"
+                          }`}
+                        >
+                          {s.status}
+                        </button>
                       </td>
 
                       <td className="p-3 text-center">
                         <button
+                          onClick={() => toggleStatus(s)}
+                          title="Cambiar estado"
+                          className="text-blue-500 hover:text-blue-700 mr-3"
+                        >
+                          <RefreshCw size={16} />
+                        </button>
+
+                        <button
                           onClick={() => deleteSale(s.id)}
-                          className="text-red-500 hover:text-red-700"
                           title="Eliminar venta"
+                          className="text-red-500 hover:text-red-700"
                         >
                           <Trash2 size={16} />
                         </button>
@@ -202,14 +244,17 @@ export default function VentasPage() {
                             {s.sale_items.map((i) => (
                               <li key={i.id}>
                                 {i.qty} ×{" "}
-                                {i.products[0]?.name ??
-                                  "Producto"}{" "}
-                                — Q
-                                {(
-                                  i.qty * i.unit_price
-                                ).toFixed(2)}
+                               {i.products?.[0]?.name ?? "Producto"}  — Q
+                                {(i.qty * i.unit_price).toFixed(2)}
                               </li>
                             ))}
+
+                            {s.dtf_cost > 0 && (
+                              <li className="text-xs opacity-70">
+                                Costo DTF: − Q
+                                {s.dtf_cost.toFixed(2)}
+                              </li>
+                            )}
                           </ul>
                         </td>
                       </tr>

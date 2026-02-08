@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   TrendingUp,
-  Calendar,
   Clock,
   CheckCircle,
   Wallet,
@@ -20,17 +19,16 @@ import { supabase } from "@/lib/supabaseClient";
    TYPES
 ====================== */
 
+type SaleItem = {
+  qty: number;
+  unit_cost: number;
+};
+
 type Sale = {
   total: number;
   status: "pendiente" | "enviado";
   created_at: string;
-  sale_items: {
-    qty: number;
-    unit_price: number;
-    products: {
-      cost: number;
-    }[];
-  }[];
+  sale_items: SaleItem[];
 };
 
 type Expense = {
@@ -46,8 +44,10 @@ export default function DashboardPage() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState<"day" | "month">("day");
 
   const today = new Date().toISOString().slice(0, 10);
+  const month = today.slice(0, 7);
 
   /* ======================
      LOAD DATA
@@ -64,10 +64,7 @@ export default function DashboardPage() {
         created_at,
         sale_items (
           qty,
-          unit_price,
-          products (
-            cost
-          )
+          unit_cost
         )
       `);
 
@@ -85,91 +82,109 @@ export default function DashboardPage() {
   }, []);
 
   /* ======================
-     CALCULOS
+     FILTRO POR PERIODO
   ====================== */
 
-  const ventasHoy = useMemo(
-    () =>
-      sales
-        .filter((s) => s.created_at.startsWith(today))
-        .reduce((sum, s) => sum + s.total, 0),
-    [sales, today]
-  );
+  const salesPeriodo = useMemo(() => {
+    return sales.filter((s) =>
+      period === "day"
+        ? s.created_at.startsWith(today)
+        : s.created_at.startsWith(month)
+    );
+  }, [sales, period, today, month]);
 
-  const ventasMes = useMemo(
-    () =>
-      sales
-        .filter((s) => s.created_at.startsWith(today.slice(0, 7)))
-        .reduce((sum, s) => sum + s.total, 0),
-    [sales, today]
+  /* ======================
+     CALCULOS CONTABLES
+  ====================== */
+
+  const totalVentas = useMemo(
+    () => salesPeriodo.reduce((sum, s) => sum + s.total, 0),
+    [salesPeriodo]
   );
 
   const pendiente = useMemo(
     () =>
-      sales
+      salesPeriodo
         .filter((s) => s.status === "pendiente")
         .reduce((sum, s) => sum + s.total, 0),
-    [sales]
+    [salesPeriodo]
   );
 
   const enviado = useMemo(
     () =>
-      sales
+      salesPeriodo
         .filter((s) => s.status === "enviado")
         .reduce((sum, s) => sum + s.total, 0),
-    [sales]
+    [salesPeriodo]
   );
 
-  const costoHoy = useMemo(
+  // 🔥 COSTO REAL (desde sale_items.unit_cost)
+  const costoPeriodo = useMemo(
     () =>
-      sales
-        .filter((s) => s.created_at.startsWith(today))
+      salesPeriodo
         .flatMap((s) => s.sale_items)
-        .reduce((sum, i) => {
-          const cost = i.products[0]?.cost || 0;
-          return sum + cost * i.qty;
-        }, 0),
-    [sales, today]
+        .reduce((sum, i) => sum + i.unit_cost * i.qty, 0),
+    [salesPeriodo]
   );
 
-  const gastosHoy = useMemo(
+  const gastosPeriodo = useMemo(
     () =>
       expenses
-        .filter((e) => e.expense_date === today)
+        .filter((e) =>
+          period === "day"
+            ? e.expense_date === today
+            : e.expense_date.startsWith(month)
+        )
         .reduce((sum, e) => sum + e.amount, 0),
-    [expenses, today]
+    [expenses, period, today, month]
   );
 
-  const gananciaHoy = ventasHoy - costoHoy - gastosHoy;
+  // ✅ GANANCIA REAL
+  const gananciaPeriodo = totalVentas - costoPeriodo - gastosPeriodo;
 
   /* ======================
      UI
   ====================== */
 
   return (
-    <main className="max-w-6xl mx-auto px-6 py-10 space-y-12">
+    <main className="max-w-6xl mx-auto px-6 py-10 space-y-10">
       {/* HEADER */}
-      <header className="space-y-1">
-        <h1 className="text-3xl font-semibold tracking-tight">
-          Dashboard
-        </h1>
-        <p className="text-sm text-muted">
-          Resumen general del negocio
-        </p>
+      <header>
+        <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>
+        <p className="text-sm text-muted">Resumen general del negocio</p>
       </header>
 
+      {/* SELECTOR PERIODO */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setPeriod("day")}
+          className={`px-4 py-1 rounded-md text-sm ${
+            period === "day"
+              ? "bg-green-500/20 text-green-400"
+              : "bg-white/5 text-muted"
+          }`}
+        >
+          Diario
+        </button>
+        <button
+          onClick={() => setPeriod("month")}
+          className={`px-4 py-1 rounded-md text-sm ${
+            period === "month"
+              ? "bg-green-500/20 text-green-400"
+              : "bg-white/5 text-muted"
+          }`}
+        >
+          Mensual
+        </button>
+      </div>
+
       {/* MÉTRICAS */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <Metric
-          label="Ventas hoy"
-          value={`Q${ventasHoy.toFixed(2)}`}
+          label={period === "day" ? "Ventas hoy" : "Ventas del mes"}
+          value={`Q${totalVentas.toFixed(2)}`}
           icon={<TrendingUp size={18} />}
           accent
-        />
-        <Metric
-          label="Ventas del mes"
-          value={`Q${ventasMes.toFixed(2)}`}
-          icon={<Calendar size={18} />}
         />
         <Metric
           label="Pendiente"
@@ -182,8 +197,8 @@ export default function DashboardPage() {
           icon={<CheckCircle size={18} />}
         />
         <Metric
-          label="Ganancia hoy"
-          value={`Q${gananciaHoy.toFixed(2)}`}
+          label={period === "day" ? "Ganancia hoy" : "Ganancia del mes"}
+          value={`Q${gananciaPeriodo.toFixed(2)}`}
           icon={<Wallet size={18} />}
         />
       </section>
@@ -195,32 +210,11 @@ export default function DashboardPage() {
         </h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Action
-            href="/ventas/nueva"
-            icon={<Plus size={18} />}
-            label="Nueva venta"
-            primary
-          />
-          <Action
-            href="/inventario"
-            icon={<Boxes size={18} />}
-            label="Inventario"
-          />
-          <Action
-            href="/ventas"
-            icon={<List size={18} />}
-            label="Libro diario"
-          />
-          <Action
-            href="/caja"
-            icon={<Wallet size={18} />}
-            label="Caja diaria"
-          />
-          <Action
-            href="/graficas"
-            icon={<BarChart3 size={18} />}
-            label="Gráficas"
-          />
+          <Action href="/ventas/nueva" icon={<Plus size={18} />} label="Nueva venta" primary />
+          <Action href="/inventario" icon={<Boxes size={18} />} label="Inventario" />
+          <Action href="/ventas" icon={<List size={18} />} label="Libro diario" />
+          <Action href="/caja" icon={<Wallet size={18} />} label="Caja diaria" />
+          <Action href="/graficas" icon={<BarChart3 size={18} />} label="Gráficas" />
           <Action
             href="https://trackingt.github.io/order-tracking/admin.html"
             icon={<Truck size={18} />}
@@ -229,9 +223,7 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {loading && (
-        <p className="text-sm opacity-60">Cargando datos…</p>
-      )}
+      {loading && <p className="text-sm opacity-60">Cargando datos…</p>}
     </main>
   );
 }
@@ -257,11 +249,7 @@ function Metric({
         {icon}
         <span>{label}</span>
       </div>
-      <div
-        className={`text-3xl font-semibold tracking-tight ${
-          accent ? "text-green-400" : "text-white"
-        }`}
-      >
+      <div className={`text-3xl font-semibold ${accent ? "text-green-400" : ""}`}>
         {value}
       </div>
     </div>
@@ -281,14 +269,12 @@ function Action({
 }) {
   const isExternal = href.startsWith("http");
 
+  const baseClass =
+    "group card p-5 flex items-center gap-4 transition hover:-translate-y-px hover:shadow-md";
+
   if (isExternal) {
     return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="group card p-5 flex items-center gap-4 transition hover:-translate-y-px hover:shadow-md"
-      >
+      <a href={href} target="_blank" rel="noopener noreferrer" className={baseClass}>
         <div className="h-9 w-9 rounded-md flex items-center justify-center bg-white/5 text-muted">
           {icon}
         </div>
@@ -300,19 +286,14 @@ function Action({
   return (
     <Link
       href={href}
-      className={`group card p-5 flex items-center gap-4 transition
-        hover:-translate-y-px hover:shadow-md
-        ${primary ? "border-green-500/30" : ""}
-      `}
+      className={`${baseClass} ${primary ? "border-green-500/30" : ""}`}
     >
       <div
-        className={`h-9 w-9 rounded-md flex items-center justify-center
-          ${
-            primary
-              ? "bg-green-500/20 text-green-400"
-              : "bg-white/5 text-muted"
-          }
-        `}
+        className={`h-9 w-9 rounded-md flex items-center justify-center ${
+          primary
+            ? "bg-green-500/20 text-green-400"
+            : "bg-white/5 text-muted"
+        }`}
       >
         {icon}
       </div>

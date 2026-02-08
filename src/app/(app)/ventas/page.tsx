@@ -16,9 +16,9 @@ type SaleItem = {
   id: string;
   qty: number;
   unit_price: number;
+  unit_cost: number;
   products: {
     name: string;
-    cost: number;
   }[];
 };
 
@@ -42,7 +42,7 @@ export default function VentasPage() {
   const [openRows, setOpenRows] = useState<string[]>([]);
 
   /* =====================
-     LOAD
+     LOAD SALES
   ===================== */
 
   async function loadSales() {
@@ -61,15 +61,20 @@ export default function VentasPage() {
           id,
           qty,
           unit_price,
+          unit_cost,
           products (
-            name,
-            cost
+            name
           )
         )
       `)
       .order("created_at", { ascending: false });
 
-    if (!error) setSales((data as Sale[]) || []);
+    if (error) {
+      alert(error.message);
+    } else {
+      setSales((data || []) as Sale[]);
+    }
+
     setLoading(false);
   }
 
@@ -78,14 +83,14 @@ export default function VentasPage() {
   }, []);
 
   /* =====================
-     GANANCIA POR VENTA
+     GANANCIA REAL
   ===================== */
 
   function getProfit(sale: Sale) {
-    return sale.sale_items.reduce((sum, i) => {
-      const cost = i.products[0]?.cost || 0;
-      return sum + (i.unit_price - cost) * i.qty;
-    }, 0);
+    return sale.sale_items.reduce(
+      (sum, i) => sum + (i.unit_price - i.unit_cost) * i.qty,
+      0
+    );
   }
 
   /* =====================
@@ -98,7 +103,6 @@ export default function VentasPage() {
     );
     if (!ok) return;
 
-    // eliminar items primero (seguridad)
     await supabase.from("sale_items").delete().eq("sale_id", id);
     await supabase.from("sales").delete().eq("id", id);
 
@@ -111,7 +115,9 @@ export default function VentasPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Ventas</h1>
+      <h1 className="text-2xl font-semibold">
+        Ventas (Libro Diario)
+      </h1>
 
       <div className="card p-0 overflow-x-auto">
         {loading ? (
@@ -129,6 +135,7 @@ export default function VentasPage() {
                 <th className="p-3 text-center">Acciones</th>
               </tr>
             </thead>
+
             <tbody>
               {sales.map((s) => {
                 const open = openRows.includes(s.id);
@@ -156,10 +163,14 @@ export default function VentasPage() {
                       </td>
 
                       <td className="p-3">
-                        {new Date(s.created_at).toLocaleDateString()}
+                        {new Date(
+                          s.created_at
+                        ).toLocaleDateString()}
                       </td>
 
-                      <td className="p-3">{s.customer_name}</td>
+                      <td className="p-3">
+                        {s.customer_name}
+                      </td>
 
                       <td className="p-3 text-right">
                         Q{s.total.toFixed(2)}
@@ -190,8 +201,13 @@ export default function VentasPage() {
                           <ul className="space-y-1">
                             {s.sale_items.map((i) => (
                               <li key={i.id}>
-                                {i.qty} × {i.products[0]?.name} — Q
-                                {(i.qty * i.unit_price).toFixed(2)}
+                                {i.qty} ×{" "}
+                                {i.products[0]?.name ??
+                                  "Producto"}{" "}
+                                — Q
+                                {(
+                                  i.qty * i.unit_price
+                                ).toFixed(2)}
                               </li>
                             ))}
                           </ul>

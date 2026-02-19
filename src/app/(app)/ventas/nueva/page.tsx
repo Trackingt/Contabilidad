@@ -2,20 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import {
-  User,
-  Phone,
-  Package,
-  Save,
-  DollarSign,
-  Trash2,
-} from "lucide-react";
+import { User, Phone, Package, Save, DollarSign, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 /* =====================
    TYPES
 ===================== */
-
 type Product = {
   id: string;
   name: string;
@@ -28,11 +20,8 @@ type Product = {
 type CartItem = {
   product: Product;
   qty: number;
+  unit_price: number; // ✅ precio editable solo en esta venta
 };
-
-/* =====================
-   PAGE
-===================== */
 
 export default function NuevaVentaPage() {
   const router = useRouter();
@@ -50,8 +39,6 @@ export default function NuevaVentaPage() {
   const [dtfCost, setDtfCost] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  /* ================= LOAD PRODUCTS ================= */
-
   async function loadProducts(q = "") {
     let query = supabase
       .from("products")
@@ -59,9 +46,7 @@ export default function NuevaVentaPage() {
       .eq("active", true)
       .order("name");
 
-    if (q.trim()) {
-      query = query.or(`name.ilike.%${q}%,sku.ilike.%${q}%`);
-    }
+    if (q.trim()) query = query.or(`name.ilike.%${q}%,sku.ilike.%${q}%`);
 
     const { data } = await query;
     setProducts((data as Product[]) || []);
@@ -76,24 +61,15 @@ export default function NuevaVentaPage() {
     return () => clearTimeout(t);
   }, [search]);
 
-  /* ================= CLICK OUTSIDE ================= */
-
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node)
-      ) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setOpenProducts(false);
       }
     }
-
     document.addEventListener("mousedown", handleClickOutside);
-    return () =>
-      document.removeEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  /* ================= CART ================= */
 
   function addToCart(product: Product) {
     setCart((prev) => {
@@ -104,13 +80,12 @@ export default function NuevaVentaPage() {
           return prev;
         }
         return prev.map((i) =>
-          i.product.id === product.id
-            ? { ...i, qty: i.qty + 1 }
-            : i
+          i.product.id === product.id ? { ...i, qty: i.qty + 1 } : i
         );
       }
-      return [...prev, { product, qty: 1 }];
+      return [...prev, { product, qty: 1, unit_price: product.price }];
     });
+
     setSearch("");
     setOpenProducts(false);
   }
@@ -121,30 +96,27 @@ export default function NuevaVentaPage() {
         i.product.id === productId
           ? {
               ...i,
-              qty:
-                qty > i.product.stock
-                  ? i.product.stock
-                  : Math.max(1, qty),
+              qty: qty > i.product.stock ? i.product.stock : Math.max(1, qty),
             }
           : i
       )
     );
   }
 
-  function removeItem(productId: string) {
+  function updateUnitPrice(productId: string, price: number) {
+    if (!Number.isFinite(price) || price < 0) return;
     setCart((prev) =>
-      prev.filter((i) => i.product.id !== productId)
+      prev.map((i) =>
+        i.product.id === productId ? { ...i, unit_price: price } : i
+      )
     );
   }
 
-  /* ================= TOTAL (solo UI) ================= */
+  function removeItem(productId: string) {
+    setCart((prev) => prev.filter((i) => i.product.id !== productId));
+  }
 
-  const total = cart.reduce(
-    (sum, i) => sum + i.qty * i.product.price,
-    0
-  );
-
-  /* ================= SAVE SALE ================= */
+  const total = cart.reduce((sum, i) => sum + i.qty * i.unit_price, 0);
 
   async function saveSale() {
     if (!customerName || cart.length === 0) {
@@ -156,21 +128,18 @@ export default function NuevaVentaPage() {
 
     const items = cart.map((i) => ({
       product_id: i.product.id,
-      product_name: i.product.name, 
+      product_name: i.product.name,
       qty: i.qty,
-      unit_price: i.product.price,
+      unit_price: i.unit_price, // ✅ usa el precio editado
       unit_cost: i.product.cost,
     }));
 
-    const { error } = await supabase.rpc(
-      "create_sale_multi",
-      {
-        p_customer_name: customerName,
-        p_customer_phone: customerPhone || null,
-        p_items: items,
-        p_dtf_cost: dtfCost,
-      }
-    );
+    const { error } = await supabase.rpc("create_sale_multi", {
+      p_customer_name: customerName,
+      p_customer_phone: customerPhone || null,
+      p_items: items,
+      p_dtf_cost: dtfCost,
+    });
 
     setLoading(false);
 
@@ -181,8 +150,6 @@ export default function NuevaVentaPage() {
 
     router.push("/ventas");
   }
-
-  /* ================= UI ================= */
 
   return (
     <div className="max-w-xl mx-auto space-y-8 pb-24">
@@ -264,25 +231,30 @@ export default function NuevaVentaPage() {
                 className="flex items-center gap-2 border rounded-lg p-2"
               >
                 <div className="flex-1">
-                  <div className="font-medium">
-                    {i.product.name}
-                  </div>
+                  <div className="font-medium">{i.product.name}</div>
                   <div className="text-xs opacity-60">
-                    Q{i.product.price}
+                    Precio original: Q{i.product.price}
                   </div>
                 </div>
+
+                {/* ✅ PRECIO EDITABLE SOLO PARA ESTA VENTA */}
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  className="input input-bordered w-28"
+                  value={i.unit_price}
+                  onChange={(e) =>
+                    updateUnitPrice(i.product.id, Number(e.target.value))
+                  }
+                />
 
                 <input
                   type="number"
                   min={1}
                   className="input input-bordered w-20"
                   value={i.qty}
-                  onChange={(e) =>
-                    updateQty(
-                      i.product.id,
-                      Number(e.target.value)
-                    )
-                  }
+                  onChange={(e) => updateQty(i.product.id, Number(e.target.value))}
                 />
 
                 <button
